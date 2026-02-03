@@ -25,17 +25,26 @@
             overflow: hidden;
         }
 
-        /* Sidebar Styling */
+        /* Sidebar Drawer Styling */
         #sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
             width: var(--sidebar-width);
             background-color: #ffffff;
             border-right: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
             padding: 24px;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-            z-index: 1000;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 2000;
+            transform: translateX(-100%);
             transition: transform 0.3s ease;
+        }
+
+        #sidebar.open {
+            transform: translateX(0);
         }
 
         #sidebar h1 {
@@ -82,54 +91,20 @@
             box-shadow: 0 4px 12px rgba(41, 98, 255, 0.3);
         }
 
-        /* Mobile Header */
-        #mobile-header {
+        /* Overlay */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
             display: none;
-            background-color: #ffffff;
-            border-bottom: 1px solid #e0e0e0;
-            padding: 12px 20px;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 1001;
+            z-index: 1500;
         }
 
-        #mobile-header h1 {
-            margin: 0;
-            font-size: 1.1rem;
-            color: var(--primary);
-            text-transform: uppercase;
-            font-weight: 800;
-        }
-
-        .menu-toggle {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--primary);
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            #sidebar {
-                position: fixed;
-                left: 0;
-                top: 0;
-                bottom: 0;
-                transform: translateX(-100%);
-            }
-
-            #sidebar.open {
-                transform: translateX(0);
-            }
-
-            #mobile-header {
-                display: flex;
-            }
-
-            .top-bar {
-                display: none !important;
-            }
+        #overlay.active {
+            display: block;
         }
 
         /* Main Content Styling */
@@ -139,6 +114,7 @@
             flex-direction: column;
             background-color: var(--bg);
             position: relative;
+            width: 100%;
         }
 
         iframe {
@@ -148,7 +124,7 @@
             background-color: #ffffff;
         }
 
-        /* Header Info */
+        /* Top Bar Info */
         .top-bar {
             background-color: #ffffff;
             padding: 12px 24px;
@@ -156,6 +132,33 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .status-container {
@@ -164,6 +167,58 @@
             gap: 8px;
             font-size: 0.85rem;
             color: #666;
+        }
+
+        /* Orientation Message for Mobile */
+        @media screen and (max-width: 768px) and (orientation: portrait) {
+            #portrait-warning {
+                display: flex;
+            }
+        }
+
+        #portrait-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .rotate-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            animation: rotate 2s infinite;
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            50% {
+                transform: rotate(90deg);
+            }
+
+            100% {
+                transform: rotate(0deg);
+            }
+        }
+
+        .footer {
+            margin-top: auto;
+            font-size: 0.75rem;
+            color: #999;
+            padding-top: 24px;
+            border-top: 1px solid #eee;
         }
 
         .pulse {
@@ -190,26 +245,23 @@
                 box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
             }
         }
-
-        .footer {
-            margin-top: auto;
-            font-size: 0.75rem;
-            color: #999;
-            padding-top: 24px;
-            border-top: 1px solid #eee;
-        }
     </style>
 </head>
 
 <body>
 
-    <div id="mobile-header">
-        <h1>Rail Analytics</h1>
-        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+    <div id="portrait-warning">
+        <div class="rotate-icon">🔄</div>
+        <h2>PLEASE ROTATE YOUR DEVICE</h2>
+        <p>This dashboard is optimized for landscape (horizontal) view for the best data readability.</p>
     </div>
 
+    <div id="overlay" onclick="toggleMenu()"></div>
+
     <div id="sidebar">
-        <h1>Rail Analytics</h1>
+        <div class="brand" style="margin-bottom: 30px;">
+            <h1>Rail Analytics</h1>
+        </div>
 
         <div class="nav-group">
             <button class="nav-btn active" onclick="loadDashboard('intermodal_chart.html', this)">
@@ -227,6 +279,10 @@
 
     <div id="main-content">
         <div class="top-bar">
+            <div class="brand">
+                <button class="menu-btn" onclick="toggleMenu()">☰</button>
+                <h1>Rail Analytics</h1>
+            </div>
             <div class="status-container">
                 <div class="pulse"></div>
                 Dashboard Live View
@@ -243,7 +299,10 @@
         document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
 
         function toggleMenu() {
-            document.getElementById('sidebar').classList.toggle('open');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
         }
 
         function loadDashboard(url, btn) {
@@ -255,8 +314,8 @@
             buttons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 
-            // Close menu on mobile
-            document.getElementById('sidebar').classList.remove('open');
+            // Close menu
+            toggleMenu();
 
             // Update timestamp
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();

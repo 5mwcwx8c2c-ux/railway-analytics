@@ -34,7 +34,8 @@
             flex-direction: column;
             padding: 24px;
             box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-            z-index: 10;
+            z-index: 1000;
+            transition: transform 0.3s ease;
         }
 
         #sidebar h1 {
@@ -79,6 +80,56 @@
             color: #ffffff;
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(41, 98, 255, 0.3);
+        }
+
+        /* Mobile Header */
+        #mobile-header {
+            display: none;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 12px 20px;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1001;
+        }
+
+        #mobile-header h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .menu-toggle {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--primary);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                transform: translateX(-100%);
+            }
+
+            #sidebar.open {
+                transform: translateX(0);
+            }
+
+            #mobile-header {
+                display: flex;
+            }
+
+            .top-bar {
+                display: none !important;
+            }
         }
 
         /* Main Content Styling */
@@ -152,6 +203,11 @@
 
 <body>
 
+    <div id="mobile-header">
+        <h1>Rail Analytics</h1>
+        <button class="menu-toggle" onclick="toggleMenu()">☰</button>
+    </div>
+
     <div id="sidebar">
         <h1>Rail Analytics</h1>
 
@@ -186,6 +242,10 @@
         // Set initial update time
         document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
 
+        function toggleMenu() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
         function loadDashboard(url, btn) {
             // Update iframe
             document.getElementById('dashboard-frame').src = url;
@@ -194,6 +254,9 @@
             const buttons = document.querySelectorAll('.nav-btn');
             buttons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+
+            // Close menu on mobile
+            document.getElementById('sidebar').classList.remove('open');
 
             // Update timestamp
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Europe Freight Volume Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1"></script>
+    <script src="eu_freight_data.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: block;
+        }
+
+        #chart-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .header {
+            border-bottom: 2px solid #2962FF;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #1a237e;
+            margin: 0;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .country-panel {
+            margin-bottom: 80px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 60px;
+        }
+
+        .country-panel:last-child {
+            border-bottom: none;
+        }
+
+        .chart-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #1a237e;
+            margin-bottom: 20px;
+            padding-left: 12px;
+            border-left: 5px solid #2962FF;
+            text-transform: uppercase;
+        }
+
+        .chart-row {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .chart-box {
+            height: 400px;
+            width: 100%;
+            position: relative;
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .chart-box.yearly {
+            height: 350px;
+            margin-top: 20px;
+        }
+
+        .btn-download {
+            display: none;
+            background-color: #2962FF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-download:hover {
+            background-color: #1565C0;
+        }
+
+        .source-text {
+            text-align: right;
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chart-container">
+        <div class="header">
+            <div>
+                <h1>Europe Rail Freight Volume</h1>
+                <div style="font-size: 14px; color: #666; margin-top: 5px;">Quarterly & Yearly Data (Thousand Tonnes)
+                    </div>
+            </div>
+        </div>
+
+        <div id="panels-root"></div>
+
+        <div class="source-text">Source: Eurostat</div>
+    </div>
+
+    <script>
+        // Register the datalabels plugin
+        Chart.register(ChartDataLabels);
+
+        // Setup Logic for Independent Axes
+        function setupIndependentAxes(chart) {
+            chart.canvas.addEventListener('mousemove', (e) => {
+                const rect = chart.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const area = chart.chartArea;
+                if (!area) return;
+
+                let mode = 'xy';
+                if (y > area.bottom) {
+                    mode = 'x';
+                    chart.canvas.style.cursor = 'ew-resize';
+                } else if (x < area.left || x > area.right) {
+                    mode = 'y';
+                    chart.canvas.style.cursor = 'ns-resize';
+                } else {
+                    chart.canvas.style.cursor = 'crosshair';
+                }
+
+                if (chart.options.plugins.zoom.zoom.mode !== mode) {
+                    chart.options.plugins.zoom.zoom.mode = mode;
+                    chart.options.plugins.zoom.pan.mode = mode;
+                    chart.update('none');
+                }
+            });
+            chart.canvas.addEventListener('mouseleave', () => {
+                chart.options.plugins.zoom.zoom.mode = 'xy';
+                chart.options.plugins.zoom.pan.mode = 'xy';
+                chart.canvas.style.cursor = 'default';
+                chart.update('none');
+            });
+        }
+
+        function calculateSMA(data, period) {
+            const results = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    results.push({ x: data[i].x, y: null });
+                } else {
+                    const sum = data.slice(i - period + 1, i + 1).reduce((acc, val) => acc + val.c, 0);
+                    results.push({ x: data[i].x, y: sum / period });
+                }
+            }
+            return results;
+        }
+
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    padding: 12,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleFont: { size: 14, weight: 'bold' },
+                    bodyFont: { size: 13 },
+                    callbacks: {
+                        label: function (context) {
+                            if (context.dataset.type === 'candlestick') {
+                                const p = context.raw;
+                                return [
+                                    `Open: ${p.o.toLocaleString()} k tons`,
+                                    `High: ${p.h.toLocaleString()} k tons`,
+                                    `Low: ${p.l.toLocaleString()} k tons`,
+                                    `Close: ${p.c.toLocaleString()} k tons`
+                                ];
+                            }
+                            if (context.dataset.type === 'line') {
+                                return `${context.dataset.label}: ${context.parsed.y ? context.parsed.y.toLocaleString(undefined, { maximumFractionDigits: 0 }) : 'N/A'} k tons`;
+                            }
+                            return `Volume: ${context.parsed.y.toLocaleString()} k tons`;
+                        }
+                    }
+                },
+                zoom: {
+                    pan: { enabled: true, mode: 'xy', threshold: 5 },
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+                },
+                datalabels: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { display: false, drawBorder: true, borderColor: '#333' },
+                    ticks: { color: '#333', font: { weight: 'bold' } }
+                },
+                y: {
+                    grid: { display: false, drawBorder: true, borderColor: '#333' },
+                    ticks: { color: '#333' },
+                    title: { display: true, text: 'Thousand Tonnes', color: '#1a237e', font: { weight: 'bold' } }
+                }
+            }
+        };
+
+        const root = document.getElementById('panels-root');
+        const countries = Object.keys(euFreightData).sort();
+
+        countries.forEach((country, index) => {
+            const data = euFreightData[country];
+            const headers = data.headers;
+            const values = data.values;
+            const yearlyTotals = data.yearly_totals;
+
+            const ohlcData = [];
+            for (let i = 0; i < headers.length; i++) {
+                if (values[i] === null) continue;
+
+                const [year, q] = headers[i].split('-Q');
+                const month = (parseInt(q) - 1) * 3 + 1;
+                const timestamp = new Date(parseInt(year), month, 15).getTime();
+
+                const close = values[i];
+                const open = i > 0 && values[i - 1] !== null ? values[i - 1] : close;
+                const high = Math.max(open, close) * 1.01;
+                const low = Math.min(open, close) * 0.99;
+
+                ohlcData.push({ x: timestamp, o: open, h: high, l: low, c: close });
+            }
+
+            if (ohlcData.length === 0) return;
+
+            const ma12 = calculateSMA(ohlcData, 12);
+            const ma24 = calculateSMA(ohlcData, 24);
+
+            const yearlyYears = Object.keys(yearlyTotals).sort();
+            const yearlyVals = yearlyYears.map(y => yearlyTotals[y]);
+            const yearlyLabels = yearlyYears.map(y => (y === '2025' ? '2025 (Q1-Q3)' : y));
+
+            const yoyValues = yearlyVals.map((v, i) => {
+                if (i === 0) return null;
+                const prev = yearlyVals[i - 1];
+                if (!prev) return null;
+                return ((v - prev) / prev) * 100;
+            });
+
+            const yearlyColors = yearlyVals.map((v, i) => {
+                if (i === 0) return '#66BB6A';
+                return v >= yearlyVals[i - 1] ? '#66BB6A' : '#EF5350';
+            });
+
+            const panel = document.createElement('div');
+            panel.className = 'country-panel';
+            panel.innerHTML = `
+                <div class="chart-title">${country}</div>
+                <div class="chart-row">
+                    <div class="chart-box"><canvas id="candle-${index}"></canvas></div>
+                    <div class="chart-box yearly"><canvas id="yearly-${index}"></canvas></div>
+                </div>
+            `;
+            root.appendChild(panel);
+
+            const candleCtx = document.getElementById(`candle-${index}`).getContext('2d');
+            const candleChartScaleOptions = JSON.parse(JSON.stringify(commonOptions.scales));
+            candleChartScaleOptions.x.type = 'time';
+            candleChartScaleOptions.x.time = { unit: 'year', displayFormats: { year: 'yyyy' } };
+            candleChartScaleOptions.x.ticks.maxRotation = 0;
+            candleChartScaleOptions.x.ticks.autoSkip = false;
+
+            const chCandle = new Chart(candleCtx, {
+                type: 'candlestick', // FIX: Keep at root for financial charts
+                data: {
+                    datasets: [
+                        {
+                            label: country,
+                            data: ohlcData,
+                            color: { up: '#4CAF50', down: '#F44336', unchanged: '#999' }
+                        },
+                        {
+                            type: 'line',
+                            label: 'MA 12',
+                            data: ma12,
+                            borderColor: '#2196F3',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            type: 'line',
+                            label: 'MA 24',
+                            data: ma24,
+                            borderColor: '#FF9800',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: candleChartScaleOptions
+                }
+            });
+            setupIndependentAxes(chCandle);
+
+            const yearlyCtx = document.getElementById(`yearly-${index}`).getContext('2d');
+            const chYearly = new Chart(yearlyCtx, {
+                type: 'bar',
+                data: {
+                    labels: yearlyLabels,
+                    datasets: [{
+                        label: 'Yearly Total',
+                        data: yearlyVals,
+                        backgroundColor: yearlyColors,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    ...commonOptions,
+                    layout: { padding: { top: 35 } },
+                    plugins: {
+                        ...commonOptions.plugins,
+                        datalabels: {
+                            display: true,
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#444',
+                            font: { weight: 'bold', size: 10 },
+                            offset: 2,
+                            formatter: (value, context) => {
+                                const i = context.dataIndex;
+                                const valStr = value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+                                const yoy = yoyValues[i];
+                                if (yoy === null) return valStr;
+                                const yoyStr = yoy > 0 ? `+${yoy.toFixed(1)}%` : `${yoy.toFixed(1)}%`;
+                                return `${valStr}\n(${yoyStr})`;
+                            }
+                        }
+                    },
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            ...commonOptions.scales.y,
+                            title: { display: true, text: 'Ann. Thousand Tonnes', color: '#1a237e' }
+                        }
+                    }
+                }
+            });
+            setupIndependentAxes(chYearly);
+        });
+
+        function downloadImage() {
+            const chartDiv = document.getElementById("chart-container");
+            html2canvas(chartDiv, { scale: 2, windowWidth: 2000 }).then(canvas => {
+                const link = document.createElement("a");
+                link.download = "europe_rail_freight_dashboard.png";
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+        }
+    </script>
+</body>
+
+</html>
